@@ -1,67 +1,123 @@
-//This project uses the Raylib framework to handle graphics, input, GUI, etc.
-//Documentation here: https://www.raylib.com/examples.html https://www.raylib.com/index.html
-
 #include "raylib.h"
 #include "raymath.h"
+#include <vector>
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
-#include "game.h"
+
+class PhysicsBody {
+public:
+    Vector2 position;
+    Vector2 velocity;
+    float drag;
+    float mass;
+
+    PhysicsBody(Vector2 pos = { 0,0 }, Vector2 vel = { 0,0 }, float d = 0.0f, float m = 1.0f) {
+        position = pos;
+        velocity = vel;
+        drag = d;
+        mass = m;
+    }
+
+    void Update(float dt, Vector2 gravity) {
+        // Apply gravity to velocity
+        velocity.x += gravity.x * dt;
+        velocity.y += gravity.y * dt;
+
+        // Apply drag (currently 0)
+        //velocity.x *= (1.0f - drag * dt);
+        //velocity.y *= (1.0f - drag * dt);
+
+        // Update position
+        position.x += velocity.x * dt;
+        position.y += velocity.y * dt;
+    }
+};
+
+class PhysicsSimulation {
+public:
+    float deltaTime;
+    float time;
+    Vector2 gravity;
+
+    PhysicsSimulation(float dt = 1.0f / 60.0f, Vector2 g = { 0, 200 }) {
+        deltaTime = dt;
+        time = 0;
+        gravity = g;
+    }
+
+    void Update(PhysicsBody& body) {
+        body.Update(deltaTime, gravity);
+        time += deltaTime;
+    }
+};
 
 const unsigned int TARGET_FPS = 50;
-float time = 0;
-float dt;
-float x = 500;
-float y = 500;
-float frequency = 1.0f;
-float amplitude = 70;
-float speed = 200;
-float angle = 30;
-float startPosX = 500;
-float startPosY = 400;
+PhysicsSimulation sim(1.0f / TARGET_FPS, { 0, 200 });
+//PhysicsBody ball({ 100, 500 }, { 0, 0 }, 0.01f, 1.0f);
 
-//Change world state
-void update() {
+std::vector<PhysicsBody> balls;
+float launchAngle = 90.0f;   // degrees
+float launchSpeed = 200.0f; 
+Vector2 launchPosition = { 100, 700 }; // start position
 
-    dt = 1.0 / TARGET_FPS;
-    time += dt;
-
-    x = x + (-sin(time * frequency)) * frequency * amplitude * dt;
-    y = y + (cos(time * frequency)) * frequency * amplitude * dt;
+void LaunchBall() {
+    PhysicsBody newBall;
+    newBall.position = launchPosition;
+    newBall.velocity = {
+        launchSpeed * cosf(launchAngle * DEG2RAD),
+        -launchSpeed * sinf(launchAngle * DEG2RAD)
+    };
+    balls.push_back(newBall); // add new ball to vector
 }
 
-//Display world state
+
+void update() {
+
+    if (IsKeyPressed(KEY_SPACE)) {  //spawn demon
+        LaunchBall(); // Add new ball
+    }
+
+    for (auto& ball : balls) {
+        sim.Update(ball);  // physics update each frame
+    }
+   // sim.Update(ball);  // physics update each frame
+}
+
+
 void draw() {
     BeginDrawing();
     ClearBackground(BLACK);
-    DrawText("nuh uh", 10, 20, 20, WHITE);
+
+    // draw the little demon(s)
+    for (auto& ball : balls) {
+        DrawCircleV(ball.position, 15, RED);
+    }
+
+    // Slide controls
+    GuiSliderBar(Rectangle{ 10, 40, 200, 20 }, "Angle", TextFormat("%.0f", launchAngle), &launchAngle, -180, 180);
+    GuiSliderBar(Rectangle{ 10, 70, 200, 20 }, "Speed", TextFormat("%.0f", launchSpeed), &launchSpeed, 0, 400);
+    GuiSliderBar(Rectangle{ 10, 100, 200, 20 }, "Gravity X", TextFormat("%.1f", sim.gravity.x), &sim.gravity.x, -1000, 1000);  //you have no idea how confused I got doing x vs y
+    GuiSliderBar(Rectangle{ 10, 130, 200, 20 }, "Gravity Y", TextFormat("%.1f", sim.gravity.y), &sim.gravity.y, -1000, 1000);
+
+    // Press space to yeet bird
+    DrawText(TextFormat("Time: %.2f", sim.time), GetScreenWidth() - 200, 20, 20, LIGHTGRAY);
+    DrawText("Press SPACE to launch birdie", 10, GetScreenHeight() - 40, 20, LIGHTGRAY);
 
 
-   // GuiSliderBar(Rectangle{ 10, 15, 1000, 20 }, "", TextFormat("%.2f", time), &time, 0, 240);
-    DrawText(TextFormat("FPS: %.2i, TIME: %.2f", TARGET_FPS, time), GetScreenWidth() - 200, 30, 15, LIGHTGRAY);
-
-    //DrawCircle(x, y, 25, RED);
-
-    GuiSliderBar(Rectangle{ 10, 40, 200, 20 }, "", TextFormat("%.0f", speed), &speed, -100, 1000);
-    GuiSliderBar(Rectangle{ 10, 60, 200, 20 }, "", TextFormat("%.0f", angle), &angle, -180, 180);
-    GuiSliderBar(Rectangle{ 10, 80, 200, 20 }, "", TextFormat("%.0f", startPosX), &startPosX, 100, GetScreenWidth() - 100);
-    GuiSliderBar(Rectangle{ 10, 100, 200, 20 }, "", TextFormat("%.0f", startPosY), &startPosY, 100, GetScreenHeight() - 100);
-
-
-    Vector2 startPos = { startPosX, startPosY };  //GetScreenHeight() - 200
-    Vector2 velocity = { cos(angle * DEG2RAD) * speed, -sin(angle * DEG2RAD ) * speed};
-
-    DrawLineEx(startPos, startPos + velocity, 3, RED);
+    Vector2 launchVel = {
+        launchSpeed * cosf(launchAngle * DEG2RAD),
+        -launchSpeed * sinf(launchAngle * DEG2RAD)
+    };
+    DrawLineEx(launchPosition, launchPosition + launchVel * 0.2f, 3, PURPLE);
 
     EndDrawing();
 }
 
-int main()
-{
-    InitWindow(InitialWidth, InitialHeight, "Physics Labs : Susana CM 101542567");
+int main() {
+    InitWindow(1200, 800, "Physics Labs : Susana CM 101542567");
     SetTargetFPS(TARGET_FPS);
 
-    while (!WindowShouldClose())
-    {
+    while (!WindowShouldClose()) {
         update();
         draw();
     }
