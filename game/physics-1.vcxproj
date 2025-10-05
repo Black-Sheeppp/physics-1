@@ -299,7 +299,6 @@
     <ClInclude Include="include\raygui.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="physicsSimulation.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
